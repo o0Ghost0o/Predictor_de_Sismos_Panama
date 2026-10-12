@@ -1,0 +1,18 @@
+{
+  "name": "sismos-panama-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3000",
+    "build": "nuxt build",
+    "preview": "nuxt preview --port 3000"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "leaflet": "^1.9.4",
+    "marked": "^18.1.0",
+    "nuxt": "^4.0.0",
+    "tailwindcss": "^4.1.0",
+    "vue": "^3.5.0"
+  }
+}
