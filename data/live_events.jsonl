@@ -38,3 +38,6 @@
 {"id": "us6000u1i9", "time": "2026-10-11 03:18:14.689000+00:00", "lat": 7.6705, "lon": -80.6908, "depth": 10, "mag": 4.4, "place": "3 km NW of Pitaloza Arriba, Panama"}
 {"id": "us6000u1lf", "time": "2026-10-11 17:11:29.405000+00:00", "lat": 7.7084, "lon": -81.6209, "depth": 10, "mag": 4.8, "place": "31 km W of R\u00edo Grande, Panama"}
 {"id": "us6000u1me", "time": "2026-10-11 21:19:20.354000+00:00", "lat": 7.7202, "lon": -81.5862, "depth": 10, "mag": 4.5, "place": "27 km W of R\u00edo Grande, Panama"}
+{"id": "us6000u1w6", "time": "2026-10-12 21:43:30.434000+00:00", "lat": 7.8231, "lon": -81.5024, "depth": 10, "mag": 4.5, "place": "19 km SW of Calidonia, Panama"}
+{"id": "us6000u1w7", "time": "2026-10-12 21:48:54.441000+00:00", "lat": 7.9307, "lon": -81.445, "depth": 10, "mag": 4.5, "place": "7 km WSW of Calidonia, Panama"}
+{"id": "us6000u1wn", "time": "2026-10-12 23:20:36.486000+00:00", "lat": 7.7028, "lon": -81.4989, "depth": 10, "mag": 6.1, "place": "18 km W of R\u00edo Grande, Panama"}

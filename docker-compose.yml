@@ -1,0 +1,91 @@
+# Predictor de Sismos Panama — stack desplegable en Coolify (o `docker compose up`).
+#
+# Coolify: nuevo recurso "Docker Compose", apunta al repo; define dominios para
+# `web` (app publica) y `api` (necesario para el websocket /ws/live del navegador).
+# Variables a fijar en la UI de Coolify (ver .env.example):
+#   NUXT_PUBLIC_WS_URL=wss://<dominio-del-api>/ws/live
+#   TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (opcional, alertas M4.5+)
+#
+# Local: `docker compose up --build`, luego web en http://localhost:3001.
+
+name: sismos-panama
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["uvicorn", "src.serve.app:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    ports:
+      - "8001:8001"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Un solo worker con todas las colas (ver docs/07-operacion.md: no partirlo).
+    command: ["dramatiq", "src.tasks.actors", "--processes", "1", "--threads", "4"]
+    environment:
+      OMP_NUM_THREADS: "1"
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api:8001
+      NUXT_PUBLIC_WS_URL: ${NUXT_PUBLIC_WS_URL:-ws://localhost:8001/ws/live}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    ports:
+      - "3001:3000"
+
+volumes:
+  redis-data:
+  # Estado vivo (ingesta, eventos, log de pronosticos). El volumen se siembra
+  # con los datos bootstrap de la imagen en el primer arranque.
+  app-data:

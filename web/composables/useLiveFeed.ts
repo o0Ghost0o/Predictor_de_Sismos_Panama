@@ -11,8 +11,9 @@ export function useLiveFeed(onQuake?: (q: any) => void) {
 
   function connect() {
     if (dead) return
+    const url = useRuntimeConfig().public.wsUrl as string
     try {
-      ws = new WebSocket('ws://localhost:8001/ws/live')
+      ws = new WebSocket(url)
     } catch { retry(); return }
     ws.onopen = () => { connected.value = true }
     ws.onmessage = (ev) => {

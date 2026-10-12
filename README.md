@@ -20,6 +20,18 @@ uv run uvicorn src.serve.app:app --port 8001
 
 Ethics: research probabilities only. No public alert SMS in PoC.
 
+## Deploy (Coolify / docker compose)
+```bash
+cp .env.example .env   # local only; en Coolify las vars se fijan en la UI
+docker compose up --build -d   # web http://localhost:3001 · api :8001
+```
+Servicios: `redis` · `api` (FastAPI :8001) · `worker` (dramatiq, un solo worker con
+todas las colas) · `web` (Nuxt). `api`/`worker` comparten el volumen `app-data`
+(estado vivo de ingesta); la imagen ya trae datos bootstrap (`quakes_full` +
+`dataset_full`) y los modelos. En Coolify dale dominio a `web` y otro a `api`, y
+fija `NUXT_PUBLIC_WS_URL=wss://<dominio-api>/ws/live` para el canal en vivo del
+navegador. Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) es opcional.
+
 ## Web (Nuxt 4 + Tailwind, ligero: sin UI lib ni charts lib)
 ```bash
 cd web && bun install && bun run dev   # http://localhost:3001 (3000 suele estar ocupado)

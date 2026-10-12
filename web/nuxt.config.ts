@@ -2,6 +2,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
   devtools: { enabled: false },
+  runtimeConfig: {
+    public: {
+      // URL del websocket en vivo. En Coolify: wss://<dominio-del-api>/ws/live.
+      wsUrl: process.env.NUXT_PUBLIC_WS_URL || 'ws://localhost:8001/ws/live'
+    }
+  },
   css: ['~/assets/css/main.css'],
   vite: { plugins: [tailwindcss()] },
   app: {

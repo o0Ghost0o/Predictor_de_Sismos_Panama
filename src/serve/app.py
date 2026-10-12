@@ -190,8 +190,9 @@ def task_status(message_id: str):
         reg = json.load(open("data/tasks.json"))
         e = reg[message_id]
         stub = SimpleNamespace(queue_name=e["queue"], actor_name=e["actor"], message_id=message_id)
-        key = RedisBackend(url="redis://127.0.0.1:6379/1").build_message_key(stub)
-        raw = redislib.Redis(db=1).lindex(key, 0)
+        from src.tasks.broker import RESULTS_URL
+        key = RedisBackend(url=RESULTS_URL).build_message_key(stub)
+        raw = redislib.Redis.from_url(RESULTS_URL).lindex(key, 0)
         if raw:
             return {"status": "terminado", "result": json.loads(raw)}
         return {"status": "en_cola_o_corriendo", "actor": e["actor"]}

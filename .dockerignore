@@ -1,0 +1,22 @@
+# Contexto minimo: fuera venv, node_modules, git, logs y datos pesados.
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+web/node_modules/
+web/.nuxt/
+web/.output/
+web/nuxt.log
+*.log
+*.pid
+mlflow.db
+mlruns/
+*.db
+*.sqlite3
+.env
+data/raw/*
+!data/raw/quakes_full.parquet
+data/processed/*
+!data/processed/dataset_full.parquet
+*.duckdb

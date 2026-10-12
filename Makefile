@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 ROOT := $(shell pwd)
 
-.PHONY: install api worker web up down status logs live tasks-logs
+.PHONY: install api worker web up down status logs live tasks-logs compose-up compose-down compose-logs
 
 install: ## deps Python (uv) + web (bun)
 	uv sync
@@ -44,3 +44,12 @@ status: ## salud de todo
 
 logs: ## cola de logs principales
 	@tail -5 server8001.log; echo ---; tail -3 dramatiq.log | cut -c1-140
+
+compose-up: ## stack docker (Coolify / local con Docker)
+	docker compose up --build -d && docker compose ps
+
+compose-down: ## baja el stack docker (conserva volumenes)
+	docker compose down
+
+compose-logs: ## logs del stack docker
+	docker compose logs -f --tail=100
