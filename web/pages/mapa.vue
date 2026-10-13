@@ -30,6 +30,7 @@ const PLACAS_NOMBRES = [
   { n: 'BLOQUE N. DE LOS ANDES', lat: 7.6, lng: -77.05 }
 ]
 let nombres: any[] = []
+let cancelado = false // true tras unmount: aborta continuaciones async pendientes
 const verFallas = ref(true)
 let fallas: any[] = []
 
@@ -218,10 +219,15 @@ function crearCalor(google: any, mapa: any, pts: Array<{ lat: number; lng: numbe
       const x = px.x * dpr, y = px.y * dpr
       const R = CALOR_RADIO * dpr
       if (x < -R || y < -R || x > canvas.width + R || y > canvas.height + R) continue
-      const t = Math.max(0.15, Math.min(1, p.w / maxW))
+      // Escala logarítmica: un M7 pesa ~9x más que un M4 y en lineal
+      // satura el enjambre a un bloque blanco. Picos más bajos y anillo
+      // intermedio para que se lean varios lóbulos en vez de uno solo.
+      const t = Math.max(0.1, Math.log(1 + p.w) / Math.log(1 + maxW))
       const [r, g, b, a] = calorColor(t)
+      const rgb = `${Math.round(r)},${Math.round(g)},${Math.round(b)}`
       const grad = ctx.createRadialGradient(x, y, 0, x, y, R)
-      grad.addColorStop(0, `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${(a * t).toFixed(3)})`)
+      grad.addColorStop(0, `rgba(${rgb},${(a * 0.5).toFixed(3)})`)
+      grad.addColorStop(0.55, `rgba(${rgb},${(a * 0.16).toFixed(3)})`)
       grad.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = grad
       ctx.beginPath()
@@ -263,6 +269,7 @@ onMounted(async () => {
   try {
     G = await loadGoogle(key)
   } catch { sinLlave.value = true; return }
+  if (cancelado) return
   map = new G.maps.Map(document.getElementById('mapa') as HTMLElement, {
     center: { lat: 8.4, lng: -80.5 }, zoom: 7,
     styles: ESTILO, disableDefaultUI: true, zoomControl: true, fullscreenControl: true,
@@ -323,10 +330,11 @@ onMounted(async () => {
   const legend = document.createElement('div')
   legend.className = 'plate-legend'
   legend.innerHTML = `Límites de placa PB2002 (Bird, 2003) · Fallas GEM<br><span class="k sub"></span>Subducción (fosa)<br><span class="k mic"></span>Microplaca (PM · ND · GP)<br><span class="k fal"></span>Falla activa (clic: nombre)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
+  if (cancelado || !map) return
   map.controls[G.maps.ControlPosition.RIGHT_BOTTOM].push(legend)
   await draw()
 })
-onUnmounted(() => { clearInterval(timer); circles = []; placas = []; nombres = []; times = []; if (heat) { heat.setMap(null); heat = null } map = null })
+onUnmounted(() => { cancelado = true; clearInterval(timer); circles = []; placas = []; nombres = []; times = []; if (heat) { heat.setMap(null); heat = null } map = null })
 watch([rango, hora, minmag], draw)
 watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? map : null) })
 watch(cursor, aplicarVis)
