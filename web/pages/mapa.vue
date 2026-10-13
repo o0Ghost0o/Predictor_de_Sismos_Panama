@@ -62,7 +62,7 @@ async function draw() {
       fillColor: col, fillOpacity: 0.28
     })
     c.addListener('click', (ev: any) => {
-      info.setContent(`<b>M${q.mag.toFixed(1)}</b> · ${Math.round(q.depth)} km · ${q.place}<br>${new Date(q.time).toLocaleString('es-PA', { timeZone: 'UTC' })} UTC`)
+      info.setContent(`<div class="iw-sismo"><b>M${q.mag.toFixed(1)}</b> · ${Math.round(q.depth)} km<br>${q.place}<br>${new Date(q.time).toLocaleString('es-PA', { timeZone: 'UTC' })} UTC</div>`)
       info.setPosition(ev.latLng)
       info.open(map)
     })
@@ -81,7 +81,7 @@ onMounted(async () => {
     styles: ESTILO, disableDefaultUI: true, zoomControl: true, fullscreenControl: true,
     backgroundColor: '#0a0e14'
   })
-  info = new G.maps.InfoWindow()
+  info = new G.maps.InfoWindow({ maxWidth: 300 })
   try {
     const gj: any = await $fetch('/plates/pb2002.json')
     for (const f of gj.features ?? []) {
@@ -152,4 +152,16 @@ watch(verPlacas, (v) => { for (const l of placas) l.setMap(v ? map : null) })
 .plate-legend .sub { border-top: 2px solid #e8b34b; }
 .plate-legend .otr { border-top: 2px dashed #7d8aa0; }
 .plate-legend .sis { width: 8px; height: 8px; border-radius: 50%; background: #a8a29e; margin: 0 9px 0 7px; }
+/* Chrome propio de Google en tema oscuro (la atribución sigue visible, como exige ToS). */
+#mapa .iw-sismo { color: #e8edf5; font-size: 13px; line-height: 1.55; }
+#mapa .iw-sismo b { color: #fff; }
+#mapa .gm-style .gm-style-iw-c { background: #111826; border: 1px solid #ffffff14; border-radius: .75rem; padding: 14px 18px 14px 14px; box-shadow: 0 8px 24px #000c; }
+#mapa .gm-style .gm-style-iw-d { overflow: auto !important; }
+#mapa .gm-style .gm-style-iw-tc::after { background: #111826; }
+#mapa .gm-style .gm-style-iw-c button.gm-ui-hover-effect span { filter: invert(0.9); }
+#mapa .gmnoprint button, #mapa .gm-control-active { background: #111826 !important; }
+#mapa .gmnoprint button img, #mapa .gm-control-active img { filter: invert(0.85); }
+#mapa .gmnoprint, #mapa .gmnoprint a { color: #93a0b4 !important; }
+#mapa .gm-style-cc { background: #0a0e14d9 !important; border-radius: .375rem; padding: 0 4px; }
+#mapa .gm-style-cc, #mapa .gm-style-cc a, #mapa .gm-style-cc span { color: #93a0b4 !important; font-size: 10px !important; }
 </style>
