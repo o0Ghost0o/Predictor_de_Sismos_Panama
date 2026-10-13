@@ -6,10 +6,11 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, {
     body: data.body || '',
     tag: data.tag || 'sismo',
+    data: { url: data.url || '/' },
     renotify: true
   }))
 })
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  event.waitUntil(clients.openWindow('/'))
+  event.waitUntil(clients.openWindow(event.notification.data.url || '/'))
 })

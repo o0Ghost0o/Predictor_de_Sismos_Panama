@@ -14,8 +14,9 @@ def test_send_push_payload(tmp_path, monkeypatch):
     assert r == {"ok": True, "status": 200}
     url, kw = post.call_args.args[0], post.call_args.kwargs
     assert url == "https://notifications.vertexdc.com/send_notification"
+    assert kw["headers"] == {"apikey": "psk_test"}
     assert kw["json"] == {"site_key": "psk_test", "title": "M5.1 — Azuero",
-                         "body": "Prof: 10 km", "tag": "sismo-m5"}
+                         "body": "Prof: 10 km", "tag": "sismo-m5", "url": "/"}
 
 
 def test_send_push_dry_run_sin_llave(tmp_path, monkeypatch):

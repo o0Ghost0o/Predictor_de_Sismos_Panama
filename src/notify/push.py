@@ -18,13 +18,17 @@ def creds():
     except FileNotFoundError:
         return None
 
-def send_push(title: str, body: str, tag: str = "sismo") -> dict:
+def send_push(title: str, body: str, tag: str = "sismo", url: str = "/") -> dict:
     key = creds()
     if not key:
         print(f"[PUSH dry-run] {title} :: {body}", flush=True)
         return {"dry_run": True}
+    # El gateway exige la llave dos veces: header `apikey` para enviar
+    # y `site_key` en el cuerpo (doc oficial de integración).
     r = requests.post(f"{URL}/send_notification",
-                      json={"site_key": key, "title": title, "body": body, "tag": tag},
+                      headers={"apikey": key},
+                      json={"site_key": key, "title": title, "body": body,
+                            "tag": tag, "url": url},
                       timeout=20)
     return {"ok": r.ok, "status": r.status_code}
 
