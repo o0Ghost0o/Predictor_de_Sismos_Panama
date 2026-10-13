@@ -30,6 +30,12 @@ const PLACAS_NOMBRES = [
   { n: 'BLOQUE N. DE LOS ANDES', lat: 7.6, lng: -77.05 }
 ]
 let nombres: any[] = []
+const verFallas = ref(true)
+let fallas: any[] = []
+
+// Familia de falla GEM por slip_type: inversa (compresiva), rumbo, normal u otra.
+const fallaColor = (s: string) => /reverse|thrust/i.test(s ?? '') ? '#e07856'
+  : /dextral|sinistral|transform|strike/i.test(s ?? '') ? '#c9a86a' : '#8a8f98'
 const base = ref<any[]>([]) // visibles, en orden de dibujo (recientes últimos), alineado con circles
 const selCi = ref(-1) // índice en circles del seleccionado
 const lista = computed(() => {
@@ -61,7 +67,7 @@ function loadGoogle(key: string): Promise<any> {
   if (w.google?.maps) return Promise.resolve(w.google)
   return new Promise((resolve, reject) => {
     const s = document.createElement('script')
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&v=weekly&libraries=visualization`
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&v=weekly`
     s.async = true
     s.onload = () => resolve(w.google)
     s.onerror = reject
@@ -112,6 +118,10 @@ async function draw() {
 const ficha = (q: any) => `<div class="iw-sismo"><b>M${q.mag.toFixed(1)}</b> · ${Math.round(q.depth)} km<br>${q.place}<br>${new Date(q.time).toLocaleString('es-PA', { timeZone: 'UTC' })} UTC</div>`
 const fmtList = (t: string) => new Date(t).toLocaleString('es-PA', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+function toggleFallas(v: boolean) {
+  for (const l of fallas) l.setMap(v ? map : null)
+}
+
 function aplicarVis() {
   if (!map) return
   circles.forEach((c, j) => c.setMap(
@@ -141,14 +151,89 @@ function pausar() {
   aplicarVis()
 }
 
+// Calor sin depender de la capa de mapas de Google eliminada en Maps JS v3.65.
+// OverlayView + canvas 2D con la misma pinta: radio 22 px, opacidad 0.55 y
+// peso 2^(M-4) por evento, sin librerias externas.
+const CALOR_RADIO = 22
+const CALOR_OPACIDAD = 0.55
+// Paradas visibles del degradado original (se omite la primera, transparente).
+const CALOR_PARADAS: Array<[number, number, number, number]> = [
+  [232, 179, 75, 0.55], [209, 154, 107, 0.75], [248, 113, 113, 0.9]
+]
+
+function calorColor(t: number): [number, number, number, number] {
+  const x = Math.min(1, Math.max(0, t)) * (CALOR_PARADAS.length - 1)
+  const i = Math.min(CALOR_PARADAS.length - 2, Math.floor(x))
+  const f = x - i
+  const a = CALOR_PARADAS[i], b = CALOR_PARADAS[i + 1]
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f]
+}
+
+function crearCalor(google: any, mapa: any, pts: Array<{ lat: number; lng: number; w: number }>) {
+  const overlay = new google.maps.OverlayView()
+  let div: HTMLDivElement | null = null
+  let canvas: HTMLCanvasElement | null = null
+  const maxW = Math.max(1, ...pts.map((p) => p.w))
+  overlay.onAdd = function (this: any) {
+    div = document.createElement('div')
+    div.style.position = 'absolute'
+    div.style.top = '0'
+    div.style.left = '0'
+    div.style.pointerEvents = 'none'
+    div.style.opacity = String(CALOR_OPACIDAD)
+    canvas = document.createElement('canvas')
+    div.appendChild(canvas)
+    // overlayMouseTarget: por encima de los circulos de epicentro (overlayLayer),
+    // con pointerEvents none para no bloquear clics. Debajo quedaba oculto.
+    this.getPanes().overlayMouseTarget.appendChild(div)
+  }
+  overlay.draw = function (this: any) {
+    const proj = this.getProjection()
+    const cont = mapa.getDiv() as HTMLElement
+    if (!proj || !div || !canvas || !cont) return
+    const W = cont.offsetWidth, H = cont.offsetHeight
+    if (!W || !H) return
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    canvas.width = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+    canvas.style.width = `${W}px`
+    canvas.style.height = `${H}px`
+    div.style.width = `${W}px`
+    div.style.height = `${H}px`
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.globalCompositeOperation = 'lighter'
+    for (const p of pts) {
+      const px = proj.fromLatLngToDivPixel(new google.maps.LatLng(p.lat, p.lng))
+      if (!px) continue
+      const x = px.x * dpr, y = px.y * dpr
+      const R = CALOR_RADIO * dpr
+      if (x < -R || y < -R || x > canvas.width + R || y > canvas.height + R) continue
+      const t = Math.max(0.15, Math.min(1, p.w / maxW))
+      const [r, g, b, a] = calorColor(t)
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, R)
+      grad.addColorStop(0, `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${(a * t).toFixed(3)})`)
+      grad.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(x, y, R, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  overlay.onRemove = function (this: any) {
+    div?.remove()
+    div = null
+    canvas = null
+  }
+  overlay.setMap(mapa)
+  return overlay
+}
+
 function buildHeat() {
   if (heat) { heat.setMap(null); heat = null }
   if (map && G && verCalor.value && base.value.length) {
-    heat = new G.maps.visualization.HeatmapLayer({
-      data: base.value.map((q) => ({ location: new G.maps.LatLng(q.lat, q.lon), weight: Math.pow(2, q.mag - 4) })),
-      map, radius: 22, opacity: 0.55,
-      gradient: ['rgba(0,0,0,0)', 'rgba(232,179,75,0.55)', 'rgba(209,154,107,0.75)', 'rgba(248,113,113,0.9)']
-    })
+    heat = crearCalor(G, map, base.value.map((q) => ({ lat: q.lat, lng: q.lon, w: Math.pow(2, q.mag - 4) })))
   }
 }
 
@@ -201,13 +286,38 @@ onMounted(async () => {
       }))
     }
   } catch { /* sin placas igual hay mapa */ }
+  try {
+    const fj: any = await $fetch('/plates/faults.json')
+    for (const f of fj.features ?? []) {
+      const g = f.geometry
+      const lines = g?.type === 'LineString' ? [g.coordinates]
+        : g?.type === 'MultiLineString' ? g.coordinates : []
+      for (const coords of lines) {
+        const path = coords.map(([lng, lat]: number[]) => ({ lat, lng }))
+        if (!path.length) continue
+        const p = f.properties ?? {}
+        const line = new G.maps.Polyline({
+          map, path, geodesic: true,
+          strokeColor: fallaColor(p.slip_type), strokeWeight: 1.1, strokeOpacity: 0.8
+        })
+        const titulo = [p.name, p.slip_type, p.net_slip_rate ? `${p.net_slip_rate} mm/año` : null].filter(Boolean).join(' · ')
+        if (titulo) line.addListener('click', (ev: any) => {
+          info.setContent(`<div class="iw-sismo"><b>Falla activa</b><br>${titulo}</div>`)
+          info.setPosition(ev.latLng)
+          info.open(map)
+        })
+        fallas.push(line)
+      }
+    }
+    if (!verFallas.value) for (const l of fallas) l.setMap(null)
+  } catch { /* sin fallas igual hay mapa */ }
   const legend = document.createElement('div')
   legend.className = 'plate-legend'
-  legend.innerHTML = `Límites de placa PB2002 (Bird, 2003)<br><span class="k sub"></span>Subducción (fosa)<br><span class="k mic"></span>Microplaca (PM · ND · GP)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
+  legend.innerHTML = `Límites de placa PB2002 (Bird, 2003) · Fallas GEM<br><span class="k sub"></span>Subducción (fosa)<br><span class="k mic"></span>Microplaca (PM · ND · GP)<br><span class="k fal"></span>Falla activa (clic: nombre)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
   map.controls[G.maps.ControlPosition.RIGHT_BOTTOM].push(legend)
   await draw()
 })
-onUnmounted(() => { clearInterval(timer); circles = []; placas = []; nombres = []; times = []; heat = null; map = null })
+onUnmounted(() => { clearInterval(timer); circles = []; placas = []; nombres = []; times = []; if (heat) { heat.setMap(null); heat = null } map = null })
 watch([rango, hora, minmag], draw)
 watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? map : null) })
 watch(cursor, aplicarVis)
@@ -245,6 +355,7 @@ watch(cursor, aplicarVis)
           </select>
         </label>
         <label class="flex items-center gap-2"><input v-model="verPlacas" type="checkbox" class="accent-amber-500" /> Placas</label>
+      <label class="flex items-center gap-2"><input v-model="verFallas" type="checkbox" class="accent-amber-500" @change="toggleFallas(($event.target as HTMLInputElement).checked)" /> Fallas</label>
       <label class="flex items-center gap-2"><input v-model="soloSel" type="checkbox" class="accent-amber-500" @change="aplicarVis()" /> Solo seleccionado</label>
       <label class="flex items-center gap-2"><input v-model="verCalor" type="checkbox" class="accent-amber-500" @change="buildHeat()" /> Calor</label>
       </div>
@@ -291,6 +402,7 @@ watch(cursor, aplicarVis)
 .plate-legend .sub { border-top: 2px solid #e8b34b; }
 .plate-legend .otr { border-top: 2px dashed #7d8aa0; }
 .plate-legend .mic { border-top: 2px solid #9fb4d8; }
+.plate-legend .fal { border-top: 2px solid #e07856; }
 .plate-name { letter-spacing: .18em; text-shadow: 0 1px 3px #000, 0 0 8px #000; font-family: inherit; white-space: nowrap; }
 .plate-legend .sis { width: 8px; height: 8px; border-radius: 50%; background: #a8a29e; margin: 0 9px 0 7px; }
 /* Chrome propio de Google en tema oscuro (la atribución sigue visible, como exige ToS). */
