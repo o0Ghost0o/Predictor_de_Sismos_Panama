@@ -11,7 +11,7 @@ const { connected } = useLiveFeed()
 const ahora = Date.now()
 const en7d = (sismos.value ?? []).filter((q) => Date.parse(q.time) >= ahora - 7 * 864e5)
 const en30d = (sismos.value ?? []).filter((q) => Date.parse(q.time) >= ahora - 30 * 864e5)
-const recientes = [...(sismos.value ?? [])].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 8)
+const recientes = [...(sismos.value ?? [])].filter((q) => Date.parse(q.time) >= ahora - 7 * 864e5).sort((a, b) => b.time.localeCompare(a.time)).slice(0, 8)
 const maxNivel = (zones.value ?? []).reduce((m, z) => Math.max(m, z.nivel ?? 0), 0)
 const maxP = (zones.value ?? []).reduce((m: any, z: any) => (!m || z.p_M4_7d > m.p_M4_7d ? z : m), null)
 const fmtFecha = (t: string) => new Date(t).toLocaleString('es-PA', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' UTC'

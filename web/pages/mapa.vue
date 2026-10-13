@@ -1,15 +1,24 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
-const rango = ref('30')
+const rango = ref('7')
 const fini = ref(''); const ffin = ref('')
 const hora = ref(-1) // -1 = todas
 const minmag = ref(4)
 const verPlacas = ref(true)
 const sinLlave = ref(false)
 const counts = ref({ total: 0, visibles: 0 })
-const lista = ref<any[]>([])
-const selIdx = ref(-1)
+const orden = ref<'fecha' | 'mag'>('fecha') // fecha sigue siendo el orden por defecto
+const soloSel = ref(false)
+const base = ref<any[]>([]) // visibles, en orden de dibujo (recientes últimos), alineado con circles
+const selCi = ref(-1) // índice en circles del seleccionado
+const lista = computed(() => {
+  const arr = base.value.map((q, ci) => ({ q, ci }))
+  arr.sort((a, b) => orden.value === 'mag'
+    ? b.q.mag - a.q.mag || b.q.time.localeCompare(a.q.time)
+    : b.q.time.localeCompare(a.q.time))
+  return arr
+})
 let map: any = null
 let circles: any[] = []
 let placas: any[] = []
@@ -55,8 +64,9 @@ async function draw() {
     .filter((q) => q.time >= desde && (!hasta || q.time <= hasta + 'T23:59:59') && (hora.value < 0 || new Date(q.time).getUTCHours() === hora.value))
     .sort((a, b) => a.time.localeCompare(b.time)) // recientes encima (se dibujan últimos)
   counts.value = { total: qs.length, visibles: sel.length }
-  lista.value = [...sel].reverse() // recientes primero
-  selIdx.value = -1
+  base.value = sel
+  selCi.value = -1
+  aplicarVis()
   for (const q of sel) {
     const col = magColor(q.mag)
     const c = new G.maps.Circle({
@@ -77,12 +87,16 @@ async function draw() {
 const ficha = (q: any) => `<div class="iw-sismo"><b>M${q.mag.toFixed(1)}</b> · ${Math.round(q.depth)} km<br>${q.place}<br>${new Date(q.time).toLocaleString('es-PA', { timeZone: 'UTC' })} UTC</div>`
 const fmtList = (t: string) => new Date(t).toLocaleString('es-PA', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-function select(i: number) {
-  if (!map || !G || !lista.value.length) return
-  selIdx.value = i
-  const q = lista.value[i]
-  const c = circles[circles.length - 1 - i] // lista va recientes-primero, circles al revés
-  if (!c) return
+function aplicarVis() {
+  if (!map) return
+  circles.forEach((c, j) => c.setMap(!soloSel.value || selCi.value < 0 || j === selCi.value ? map : null))
+}
+
+function select(item: { q: any; ci: number }) {
+  if (!map || !G) return
+  selCi.value = item.ci
+  aplicarVis()
+  const q = item.q
   map.panTo({ lat: q.lat, lng: q.lon })
   info.setContent(ficha(q))
   info.setPosition({ lat: q.lat, lng: q.lon })
@@ -181,18 +195,25 @@ watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? 
           </select>
         </label>
         <label class="flex items-center gap-2"><input v-model="verPlacas" type="checkbox" class="accent-amber-500" /> Placas</label>
+      <label class="flex items-center gap-2"><input v-model="soloSel" type="checkbox" class="accent-amber-500" @change="aplicarVis()" /> Solo seleccionado</label>
       </div>
       <div class="flex flex-col gap-4 lg:flex-row">
         <div id="mapa" class="card h-[65vh] min-h-[420px] w-full overflow-hidden lg:flex-1" />
         <aside class="card flex max-h-[40vh] flex-col overflow-hidden lg:max-h-[65vh] lg:min-h-[420px] lg:w-[340px] lg:shrink-0">
-          <p class="border-b border-white/10 px-4 py-2 text-[11px] uppercase tracking-wide text-slate-500">Eventos · <span class="num">{{ lista.length }}</span></p>
+          <div class="flex items-center justify-between border-b border-white/10 px-4 py-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Eventos · <span class="num">{{ lista.length }}</span></p>
+            <select v-model="orden" class="input ml-2 !rounded-md !px-2 !py-1 text-[11px]" title="Orden">
+              <option value="fecha">Fecha</option>
+              <option value="mag">Magnitud</option>
+            </select>
+          </div>
           <ul class="divide-y divide-white/5 overflow-y-auto">
-            <li v-for="(q, i) in lista" :key="q.id ?? q.time + q.place">
-              <button class="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-white/5" :class="i === selIdx ? 'bg-white/5' : ''" @click="select(i)">
-                <span class="num w-12 shrink-0 text-sm font-semibold" :style="{ color: magColor(q.mag) }">M{{ q.mag.toFixed(1) }}</span>
+            <li v-for="item in lista" :key="item.q.id ?? item.q.time + item.q.place">
+              <button class="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-white/5" :class="item.ci === selCi ? 'bg-white/5' : ''" @click="select(item)">
+                <span class="num w-12 shrink-0 text-sm font-semibold" :style="{ color: magColor(item.q.mag) }">M{{ item.q.mag.toFixed(1) }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-[13px] text-slate-200">{{ q.place }}</span>
-                  <span class="num block text-[11px] text-slate-500">{{ fmtList(q.time) }} UTC · {{ Math.round(q.depth) }} km</span>
+                  <span class="block truncate text-[13px] text-slate-200">{{ item.q.place }}</span>
+                  <span class="num block text-[11px] text-slate-500">{{ fmtList(item.q.time) }} UTC · {{ Math.round(item.q.depth) }} km</span>
                 </span>
               </button>
             </li>

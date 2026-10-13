@@ -2,8 +2,8 @@
 const { data: live } = await useFetch<any[]>('/api/live')
 const { data: ing } = await useFetch<any>('/api/ingesta')
 const magColor = (m: number) => m >= 6 ? 'text-red-300' : m >= 5 ? 'text-orange-300' : m >= 4 ? 'text-yellow-200' : 'text-slate-300'
-// Histórico del catálogo propio
-const preset = ref('24h')
+// Histórico del catálogo propio (7 días por defecto, como todo el sitio)
+const preset = ref('7d')
 const fini = ref(''); const ffin = ref('')
 const hist = ref<any[]>([])
 const histLoading = ref(false)
