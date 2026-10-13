@@ -101,6 +101,17 @@ onMounted(async () => {
     backgroundColor: '#0a0e14'
   })
   info = new G.maps.InfoWindow({ maxWidth: 300 })
+
+// Microplacas y bloques menores PB2002 relevantes en la región.
+const MICRO = new Set(['PM', 'ND', 'CR', 'GP'])
+const PLACAS_NOMBRES = [
+  { n: 'COCOS', lat: 5.6, lng: -85.4 },
+  { n: 'NAZCA', lat: 4.4, lng: -81.6 },
+  { n: 'CARIBE', lat: 10.9, lng: -80.1 },
+  { n: 'MICROPLACA DE PANAMÁ', lat: 8.75, lng: -80.35 },
+  { n: 'BLOQUE N. DE LOS ANDES', lat: 7.6, lng: -77.05 }
+]
+let nombres: any[] = []
   try {
     const gj: any = await $fetch('/plates/pb2002.json')
     for (const f of gj.features ?? []) {
@@ -109,23 +120,33 @@ onMounted(async () => {
         : []
       if (!coords.length) continue
       const sub = f.properties?.Type === 'subduction'
+      const micro = !sub && (MICRO.has(f.properties?.PlateA) || MICRO.has(f.properties?.PlateB))
       const line = new G.maps.Polyline({
         map, path: coords, geodesic: true,
-        strokeColor: sub ? '#e8b34b' : '#7d8aa0', strokeWeight: sub ? 2 : 1.2, strokeOpacity: sub ? 0.95 : 0.6,
-        ...(sub ? {} : { icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '9px' }], strokeOpacity: 0 })
+        strokeColor: sub ? '#e8b34b' : micro ? '#9fb4d8' : '#7d8aa0',
+        strokeWeight: sub ? 2 : micro ? 1.5 : 1.2,
+        strokeOpacity: sub ? 0.95 : micro ? 0.85 : 0.6,
+        ...(!sub && !micro ? { icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '9px' }], strokeOpacity: 0 } : {})
       })
       placas.push(line)
+    }
+    for (const p of PLACAS_NOMBRES) {
+      nombres.push(new G.maps.Marker({
+        position: { lat: p.lat, lng: p.lng }, map, clickable: false,
+        icon: { path: G.maps.SymbolPath.CIRCLE, scale: 0.1, fillOpacity: 0, strokeOpacity: 0 },
+        label: { text: p.n, color: '#8fa0b8', fontSize: '10px', fontWeight: '600', className: 'plate-name' }
+      }))
     }
   } catch { /* sin placas igual hay mapa */ }
   const legend = document.createElement('div')
   legend.className = 'plate-legend'
-  legend.innerHTML = `Límites de placa PB2002 (Bird, 2003)<br><span class="k sub"></span>Subducción (fosa)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
+  legend.innerHTML = `Límites de placa PB2002 (Bird, 2003)<br><span class="k sub"></span>Subducción (fosa)<br><span class="k mic"></span>Microplaca (PM · ND · GP)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
   map.controls[G.maps.ControlPosition.RIGHT_BOTTOM].push(legend)
   await draw()
 })
 onUnmounted(() => { circles = []; placas = []; map = null })
 watch([rango, hora, minmag], draw)
-watch(verPlacas, (v) => { for (const l of placas) l.setMap(v ? map : null) })
+watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? map : null) })
 </script>
 <template>
   <div class="space-y-4">
@@ -187,6 +208,8 @@ watch(verPlacas, (v) => { for (const l of placas) l.setMap(v ? map : null) })
 .plate-legend .k { display: inline-block; width: 22px; height: 0; vertical-align: middle; margin-right: 6px; }
 .plate-legend .sub { border-top: 2px solid #e8b34b; }
 .plate-legend .otr { border-top: 2px dashed #7d8aa0; }
+.plate-legend .mic { border-top: 2px solid #9fb4d8; }
+.plate-name { letter-spacing: .18em; text-shadow: 0 1px 3px #000, 0 0 8px #000; font-family: inherit; white-space: nowrap; }
 .plate-legend .sis { width: 8px; height: 8px; border-radius: 50%; background: #a8a29e; margin: 0 9px 0 7px; }
 /* Chrome propio de Google en tema oscuro (la atribución sigue visible, como exige ToS). */
 #mapa .iw-sismo { color: #e8edf5; font-size: 13px; line-height: 1.55; }
