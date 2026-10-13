@@ -149,6 +149,22 @@ def ingest_rss():
     except Exception as e:
         return {"error": str(e)[:100]}
 
+@dramatiq.actor(queue_name="io", store_results=True, max_retries=3, min_backoff=30_000)
+def ingest_sismolive(days: int = 3):
+    """Agregador MUPA (USGS+EMSC+IGC): ventana movil, cruce sin duplicar."""
+    import pandas as pd
+    from datetime import datetime, timezone, timedelta
+    from src.ingest.sismolive import fetch_sismolive, merge_portal
+    from src.ingest.api_usgs import atomic_parquet
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sl = fetch_sismolive(start, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    old = pd.read_parquet("data/raw/quakes_full.parquet")
+    merged, n = merge_portal(old, sl)
+    if n:
+        atomic_parquet(merged, "data/raw/quakes_full.parquet")
+    return {"nuevos_portal": int(n), "total": int(len(merged))}
+
 @dramatiq.actor(queue_name="live")
 def fast_poll():
     """Carril rápido 60s: IGC-UPA + RSS RSN. USGS queda en el loop de 5min."""
@@ -164,6 +180,7 @@ def live_poll():
     start = (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
     ingest_quakes.send(start, now.strftime("%Y-%m-%dT%H:%M:%S"))
     ingest_igc.send()
+    ingest_sismolive.send()
     live_poll.send_with_options(delay=300_000)
 
 @dramatiq.actor(queue_name="default", store_results=True, time_limit=600_000)
