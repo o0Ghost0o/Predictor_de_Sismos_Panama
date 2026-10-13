@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 const estado = ref<'idle' | 'listo' | 'activado' | 'error' | 'no-soportado'>('idle')
 const detalle = ref('')
 const paso = ref('')
+const esBrave = ref(false)
 
 function keyToBytes(key: string) {
   const pad = '='.repeat((4 - (key.length % 4)) % 4)
@@ -12,6 +13,11 @@ function keyToBytes(key: string) {
 }
 
 onMounted(async () => {
+  try {
+    const brands = (navigator as any).userAgentData?.brands ?? []
+    esBrave.value = brands.some((b: any) => String(b.brand || '').includes('Brave'))
+      || await (navigator as any).brave?.isBrave?.() === true
+  } catch { /* detección opcional */ }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) { estado.value = 'no-soportado'; return }
   try {
     const reg = await navigator.serviceWorker.register('/sw-push.js')
@@ -54,6 +60,10 @@ async function activar() {
       <template v-else-if="estado === 'no-soportado'">Este navegador no soporta push</template>
       <template v-else-if="estado === 'error'">No se pudo activar{{ detalle ? ': ' + detalle : '' }}. Abre la consola (F12) para el detalle. Pista: en Brave activa "Usar servicios de Google para push" en ajustes; en Safari de escritorio el push solo funciona en apps web instaladas.</template>
       <template v-else>Push del servidor apagado en este navegador</template>
+    </p>
+    <p v-if="esBrave && estado !== 'activado'" class="w-full text-xs text-amber-200/80">
+      Brave bloquea el servicio push de Google por defecto: actívalo en brave://settings/privacy
+      ("Usar servicios de Google para notificaciones push"), reinicia y reintenta.
     </p>
   </div>
 </template>
