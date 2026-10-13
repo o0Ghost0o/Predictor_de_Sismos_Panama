@@ -19,6 +19,15 @@ def test_dataset_readable():
     assert {"zone", "date"} <= set(df.columns)
 
 
+def test_dataset_covers_recent_week():
+    """El hindcast por fecha cae al ultimo row <= fecha: si el dataset se
+    queda atras, todas las fechas recientes devuelven lo mismo sin avisar."""
+    import datetime
+    df = pd.read_parquet("data/processed/dataset_full.parquet")
+    age = datetime.date.today() - pd.to_datetime(df.date.max()).date()
+    assert age.days <= 14, f"dataset desactualizado: date_max hace {age.days} dias"
+
+
 def test_model_bundle_loads():
     bundle = pickle.load(open("models/lgbm_full.pkl", "rb"))
     assert "features" in bundle
