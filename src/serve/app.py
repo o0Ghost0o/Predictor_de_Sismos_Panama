@@ -1,8 +1,42 @@
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from functools import lru_cache
+from contextlib import asynccontextmanager
 import pandas as pd, pickle
 
-app = FastAPI(title="Sismos Panama PoC")
+def _edad_archivo_min(path: str, clave: str = "ts") -> float | None:
+    """Edad en minutos de un stamp JSON; None si no existe o es ilegible."""
+    import json
+    from datetime import datetime, timezone
+    try:
+        ts = json.load(open(path))[clave]
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(ts)).total_seconds() / 60
+    except Exception:
+        return None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-arranque de ingesta en vivo: en produccion nadie pulsa /tasks/live-start
+    # tras cada despliegue/reinicio. El heartbeat lo toca cada pasada de live_poll;
+    # solo encolamos si no hay latido reciente (los loops se auto-reagendan solos).
+    # Nunca tumba el arranque del API.
+    latido = _edad_archivo_min("data/live_heartbeat.json")
+    if latido is not None and latido < 10:
+        yield
+        return
+    edad = _edad_archivo_min("data/last_ingest.json")
+    if edad is None or edad > 15:
+        try:
+            from src.tasks.actors import live_poll, fast_poll, resync_catalog
+            live_poll.send(); fast_poll.send()
+            if edad is None or edad > 7 * 24 * 60:
+                resync_catalog.send()  # backfill tardio USGS, caro: solo si >7d
+            print(f"[boot] loops de ingesta encolados (edad stamp: {edad})", flush=True)
+        except Exception as e:
+            print(f"[boot] ingesta auto no disponible ({e}); usar POST /tasks/live-start",
+                  flush=True)
+    yield
+
+app = FastAPI(title="Sismos Panama PoC", lifespan=lifespan)
 
 @lru_cache
 def _load():
@@ -39,7 +73,15 @@ def _predict(zone: str, date: str | None):
     feats = bundle["features"]
     zone = zone.upper()
     if date is None:
-        row = df[df.zone == zone].sort_values("date").iloc[-1:]
+        # Fila viva de hoy (catalogo + colas del dataset): las replicas M4/M5
+        # entran al nivel el mismo dia. Si falla, ultima fila versionada.
+        try:
+            from src.features.live_row import live_rows
+            lv = live_rows()
+            row = lv[lv.zone == zone].iloc[-1:]
+            assert len(row) == 1 and all(c in row.columns for c in feats)
+        except Exception:
+            row = df[df.zone == zone].sort_values("date").iloc[-1:]
     else:
         d = pd.to_datetime(date)
         rows = df[(df.zone == zone) & (df.date == d)]
@@ -77,7 +119,8 @@ def _predict(zone: str, date: str | None):
             "bandas_gr": {str(m): v for m, v in gr.items() if v >= 0.01},
             "curva_diaria": curva, "curva_m5": curva5, "curva_m6": curva6,
             "nivel": niv, "mensaje": txt,
-            "observed_M4_next7d": int(r["label_M4_7d"])}
+            "observed_M4_next7d": (None if pd.isna(r["label_M4_7d"])
+                                   else int(r["label_M4_7d"]))}
 
 @app.get("/backtest")
 def backtest():
