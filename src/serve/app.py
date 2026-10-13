@@ -206,6 +206,31 @@ def task_status(message_id: str):
     except Exception as e:
         return {"status": "desconocido", "detail": str(e)[:200]}
 
+USGS_PAGE = "https://earthquake.usgs.gov/earthquakes/eventpage/{}"
+IGC_HOME = "https://sismosgeociencias.up.ac.pa/"
+SISMOLIVE_HOME = "https://sismolive.mupa.gob.pa/"
+EMSC_HOME = "https://www.emsc.eu/"
+
+
+def event_url(qid: str | None, src: str | None) -> str | None:
+    """Enlace verificable segun procedencia del catalogo.
+
+    - USGS: pagina del evento (id estable).
+    - IGC-UPA: solo home — el detalle `ultimosismo.html?...` es una lista
+      rodante sin archivo y no se guarda en el parquet.
+    - SismoLive/EMSC (`sl-...`): portal agregador (tampoco guarda deep-link).
+    """
+    qid = (qid or "").strip()
+    s = (src or "").strip().lower()
+    if qid.startswith("igc-") or s == "igc":
+        return IGC_HOME
+    if qid.startswith("sl-"):
+        return EMSC_HOME if s == "emsc" else SISMOLIVE_HOME
+    if qid and s in ("usgs", ""):
+        return USGS_PAGE.format(qid)
+    return None
+
+
 @app.get("/quakes")
 def quakes(minmag: float = 0.0, limit: int = 5000, start: str | None = None, end: str | None = None):
     q = pd.read_parquet("data/raw/quakes_full.parquet")
@@ -216,7 +241,13 @@ def quakes(minmag: float = 0.0, limit: int = 5000, start: str | None = None, end
         q = q[q.time <= pd.to_datetime(end, utc=True) + pd.Timedelta(days=1)]
     q = q[q.mag >= minmag].sort_values("time").tail(limit)
     q["time"] = q.time.astype(str)
-    return q[["time", "lat", "lon", "depth", "mag", "place"]].to_dict(orient="records")
+    if "id" not in q.columns:
+        q["id"] = None
+    if "src" not in q.columns:
+        q["src"] = "usgs"
+    out = q[["time", "lat", "lon", "depth", "mag", "place", "id", "src"]].copy()
+    out["url"] = [event_url(i, s) for i, s in zip(out["id"], out["src"])]
+    return out.to_dict(orient="records")
 
 @app.get("/ingesta")
 def ingesta():

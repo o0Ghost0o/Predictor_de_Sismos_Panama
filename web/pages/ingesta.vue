@@ -108,9 +108,14 @@ const { connected, last } = useLiveFeed((q) => {
         </template>
         <span class="num ml-auto text-xs text-slate-500">{{ histLoading ? '…' : `${hist.length} eventos en rango${hist.length ? ` · ${new Date(hist[hist.length-1].time).toLocaleDateString('es-PA')} → ${new Date(hist[0].time).toLocaleDateString('es-PA')}` : ''}` }}</span>
       </div>
+      <p class="mb-2 text-xs text-slate-500">Fuente por evento: USGS enlaza a la página del sismo; IGC/SismoLive/EMSC al portal (el detalle IGC rota y no archiva).</p>
       <div v-if="hist.length" class="max-h-[480px] divide-y divide-white/5 overflow-y-auto text-sm">
-        <div v-for="(e, i) in hist" :key="i" class="flex items-center justify-between gap-3 py-1.5">
-          <span>{{ e.place }}</span>
+        <div v-for="(e, i) in hist" :key="e.id ?? i" class="flex items-center justify-between gap-3 py-1.5">
+          <span class="flex min-w-0 items-baseline gap-2">
+            <a v-if="e.url" :href="e.url" target="_blank" class="truncate hover:underline" :title="e.id">{{ e.place }}</a>
+            <span v-else class="truncate">{{ e.place }}</span>
+            <span v-if="e.src" class="shrink-0 rounded border border-white/10 px-1 text-[10px] uppercase text-slate-500">{{ e.src }}</span>
+          </span>
           <div class="flex shrink-0 items-center gap-3 text-xs text-slate-400">
             <span>{{ new Date(e.time).toLocaleString('es-PA') }}</span>
             <span class="num font-semibold" :class="magColor(e.mag)">M{{ e.mag?.toFixed(1) }}</span>
