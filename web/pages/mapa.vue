@@ -19,6 +19,16 @@ const verCalor = ref(false)
 let timer: any = null
 let times: number[] = []
 let heat: any = null
+// Microplacas y bloques menores PB2002 relevantes en la región.
+const MICRO = new Set(['PM', 'ND', 'CR', 'GP'])
+const PLACAS_NOMBRES = [
+  { n: 'COCOS', lat: 5.6, lng: -85.4 },
+  { n: 'NAZCA', lat: 4.4, lng: -81.6 },
+  { n: 'CARIBE', lat: 10.9, lng: -80.1 },
+  { n: 'MICROPLACA DE PANAMÁ', lat: 8.75, lng: -80.35 },
+  { n: 'BLOQUE N. DE LOS ANDES', lat: 7.6, lng: -77.05 }
+]
+let nombres: any[] = []
 const base = ref<any[]>([]) // visibles, en orden de dibujo (recientes últimos), alineado con circles
 const selCi = ref(-1) // índice en circles del seleccionado
 const lista = computed(() => {
@@ -161,17 +171,6 @@ onMounted(async () => {
     backgroundColor: '#0a0e14'
   })
   info = new G.maps.InfoWindow({ maxWidth: 300 })
-
-// Microplacas y bloques menores PB2002 relevantes en la región.
-const MICRO = new Set(['PM', 'ND', 'CR', 'GP'])
-const PLACAS_NOMBRES = [
-  { n: 'COCOS', lat: 5.6, lng: -85.4 },
-  { n: 'NAZCA', lat: 4.4, lng: -81.6 },
-  { n: 'CARIBE', lat: 10.9, lng: -80.1 },
-  { n: 'MICROPLACA DE PANAMÁ', lat: 8.75, lng: -80.35 },
-  { n: 'BLOQUE N. DE LOS ANDES', lat: 7.6, lng: -77.05 }
-]
-let nombres: any[] = []
   try {
     const gj: any = await $fetch('/plates/pb2002.json')
     for (const f of gj.features ?? []) {
