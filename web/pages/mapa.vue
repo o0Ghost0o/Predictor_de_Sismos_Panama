@@ -10,7 +10,7 @@ const sinLlave = ref(false)
 const counts = ref({ total: 0, visibles: 0 })
 const orden = ref<'fecha' | 'mag'>('fecha') // fecha sigue siendo el orden por defecto
 const soloSel = ref(false)
-const vel = ref(3) // días por segundo
+const vel = ref(2) // eventos por paso (tick 200 ms)
 const cursor = ref(0) // ms: los eventos con time <= cursor están visibles
 const rangoMs = ref({ min: 0, max: 0 })
 const playing = ref(false)
@@ -18,6 +18,7 @@ const loop = ref(false)
 const verCalor = ref(false)
 let timer: any = null
 let times: number[] = []
+let ordenT: number[] = [] // tiempos ordenados para avanzar por evento
 let heat: any = null
 // Microplacas y bloques menores PB2002 relevantes en la región.
 const MICRO = new Set(['PM', 'ND', 'CR', 'GP'])
@@ -86,6 +87,7 @@ async function draw() {
   base.value = sel
   selCi.value = -1
   times = sel.map((q) => Date.parse(q.time))
+  ordenT = [...times].sort((a, b) => a - b)
   rangoMs.value = times.length ? { min: Math.min(...times), max: Math.max(...times) } : { min: 0, max: 0 }
   cursor.value = rangoMs.value.max
   buildHeat()
@@ -118,14 +120,16 @@ function aplicarVis() {
 
 function play() {
   if (!map || !base.value.length) return
-  if (cursor.value >= rangoMs.value.max) cursor.value = rangoMs.value.min
+  let pos = ordenT.filter((t) => t <= cursor.value).length
+  if (pos >= ordenT.length) pos = 0
   playing.value = true
   clearInterval(timer)
   timer = setInterval(() => {
-    cursor.value += vel.value * 864e5 * 0.2
-    if (cursor.value >= rangoMs.value.max) {
-      if (loop.value) cursor.value = rangoMs.value.min
-      else { cursor.value = rangoMs.value.max; pausar(); return }
+    pos = Math.min(pos + vel.value, ordenT.length)
+    cursor.value = ordenT[pos - 1] ?? rangoMs.value.min
+    if (pos >= ordenT.length) {
+      if (loop.value) pos = 0
+      else { pausar(); return }
     }
     aplicarVis()
   }, 200)
@@ -248,9 +252,9 @@ watch(cursor, aplicarVis)
         <button class="btn shrink-0 px-4 text-sm" :disabled="!base.length" @click="playing ? pausar() : play()">{{ playing ? 'Pausar' : 'Reproducir' }}</button>
         <input v-model.number="cursor" type="range" :min="rangoMs.min" :max="rangoMs.max" :disabled="!base.length" step="3600000" class="w-full accent-amber-500" @input="pausar()" title="Arrastrar para reproducir manualmente" />
         <span class="num shrink-0 text-xs text-slate-300">{{ base.length ? fmtList(new Date(cursor).toISOString()) + ' UTC' : '—' }}</span>
-        <select v-model.number="vel" class="input shrink-0 !rounded-md !px-2 !py-1 text-xs" title="Velocidad">
-          <option :value="1">1 d/s</option><option :value="3">3 d/s</option>
-          <option :value="7">7 d/s</option><option :value="30">30 d/s</option>
+        <select v-model.number="vel" class="input shrink-0 !rounded-md !px-2 !py-1 text-xs" title="Eventos por paso">
+          <option :value="1">1 ev</option><option :value="2">2 ev</option>
+          <option :value="5">5 ev</option><option :value="10">10 ev</option>
         </select>
         <label class="flex shrink-0 items-center gap-2 text-xs text-slate-400"><input v-model="loop" type="checkbox" class="accent-amber-500" /> Repetir</label>
       </div>
