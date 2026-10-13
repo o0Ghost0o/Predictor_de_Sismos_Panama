@@ -212,7 +212,9 @@ function crearCalor(google: any, mapa: any, pts: Array<{ lat: number; lng: numbe
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.globalCompositeOperation = 'lighter'
+    // Pintar encima en vez de sumar luz: cientos de manchas acumuladas
+    // siempre queman a blanco; asi lo denso converge al color del dato.
+    ctx.globalCompositeOperation = 'source-over'
     for (const p of pts) {
       const px = proj.fromLatLngToDivPixel(new google.maps.LatLng(p.lat, p.lng))
       if (!px) continue
@@ -226,8 +228,8 @@ function crearCalor(google: any, mapa: any, pts: Array<{ lat: number; lng: numbe
       const [r, g, b, a] = calorColor(t)
       const rgb = `${Math.round(r)},${Math.round(g)},${Math.round(b)}`
       const grad = ctx.createRadialGradient(x, y, 0, x, y, R)
-      grad.addColorStop(0, `rgba(${rgb},${(a * 0.5).toFixed(3)})`)
-      grad.addColorStop(0.55, `rgba(${rgb},${(a * 0.16).toFixed(3)})`)
+      grad.addColorStop(0, `rgba(${rgb},${(a * 0.45).toFixed(3)})`)
+      grad.addColorStop(0.55, `rgba(${rgb},${(a * 0.15).toFixed(3)})`)
       grad.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = grad
       ctx.beginPath()
