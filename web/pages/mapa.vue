@@ -74,14 +74,14 @@ onMounted(async () => {
   const key = useRuntimeConfig().public.googleMapsKey as string
   if (!key) { sinLlave.value = true; return }
   try {
-    G = (await loadGoogle(key)).maps
+    G = await loadGoogle(key)
   } catch { sinLlave.value = true; return }
-  map = new G.Map(document.getElementById('mapa') as HTMLElement, {
+  map = new G.maps.Map(document.getElementById('mapa') as HTMLElement, {
     center: { lat: 8.4, lng: -80.5 }, zoom: 7,
     styles: ESTILO, disableDefaultUI: true, zoomControl: true, fullscreenControl: true,
     backgroundColor: '#0a0e14'
   })
-  info = new G.InfoWindow()
+  info = new G.maps.InfoWindow()
   try {
     const gj: any = await $fetch('/plates/pb2002.json')
     for (const f of gj.features ?? []) {
@@ -90,7 +90,7 @@ onMounted(async () => {
         : []
       if (!coords.length) continue
       const sub = f.properties?.Type === 'subduction'
-      const line = new G.Polyline({
+      const line = new G.maps.Polyline({
         map, path: coords, geodesic: true,
         strokeColor: sub ? '#e8b34b' : '#7d8aa0', strokeWeight: sub ? 2 : 1.2, strokeOpacity: sub ? 0.95 : 0.6,
         ...(sub ? {} : { icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '9px' }], strokeOpacity: 0 })
@@ -101,7 +101,7 @@ onMounted(async () => {
   const legend = document.createElement('div')
   legend.className = 'plate-legend'
   legend.innerHTML = `Límites de placa PB2002 (Bird, 2003)<br><span class="k sub"></span>Subducción (fosa)<br><span class="k otr"></span>Otro límite de placa<br><span class="k sis"></span>Epicentro M4+ (tamaño ∝ M)`
-  map.controls[G.ControlPosition.RIGHT_BOTTOM].push(legend)
+  map.controls[G.maps.ControlPosition.RIGHT_BOTTOM].push(legend)
   await draw()
 })
 onUnmounted(() => { circles = []; placas = []; map = null })
