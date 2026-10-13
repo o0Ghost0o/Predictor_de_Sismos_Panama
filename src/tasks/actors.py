@@ -119,9 +119,10 @@ def ingest_igc():
 
 @dramatiq.actor(queue_name="live", store_results=True)
 def alert_new(events: list, umbral: float = 4.5):
-    """Alerta RT por Telegram para eventos >= umbral en bbox Panamá. Dedupe por id."""
+    """Alerta RT (Telegram + push vertexdc) para eventos >= umbral en bbox Panamá. Dedupe por id."""
     import json, os
     from src.notify.telegram import send, quake_text
+    from src.notify.push import send_push, quake_push
     seen_path = "data/alerts_sent.json"
     seen = set(json.load(open(seen_path))) if os.path.exists(seen_path) else set()
     sent = 0
@@ -131,6 +132,8 @@ def alert_new(events: list, umbral: float = 4.5):
         if not (6.0 <= (ev.get("lat") or 0) <= 10.5 and -84.0 <= (ev.get("lon") or 0) <= -76.5):
             continue
         send(quake_text(ev))
+        title, body = quake_push(ev)
+        send_push(title, body, tag=f"sismo-m{int(ev.get('mag') or 0)}")
         seen.add(ev["id"]); sent += 1
     json.dump(sorted(seen)[-2000:], open(seen_path, "w"))
     return {"alertados": sent}

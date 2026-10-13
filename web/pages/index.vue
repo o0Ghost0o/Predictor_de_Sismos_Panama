@@ -87,6 +87,7 @@ const porNivel = [...(zones.value ?? [])].sort((a, b) => b.nivel - a.nivel || b.
         </div>
       </div>
       <p class="mt-1 text-xs text-slate-500">Suenan en tu navegador cuando ingresa un sismo nuevo ≥ umbral. Solo con esta pestaña abierta; no es alerta oficial.</p>
+      <div class="mt-3 border-t border-white/5 pt-3"><PushActivator /></div>
       <ul v-if="alerts.length" class="mt-3 divide-y divide-white/5">
         <li v-for="a in alerts" :key="a.id" class="flex items-center gap-3 py-2">
           <span class="num w-14 shrink-0 text-base font-bold" :class="a.mag >= 6 ? 'text-red-300' : a.mag >= 5 ? 'text-orange-300' : 'text-amber-200'">M{{ a.mag.toFixed(1) }}</span>

@@ -9,6 +9,8 @@ mlruns/
 *.parquet
 *.duckdb
 .env
+data/push.json
+data/telegram.json
 *.log
 *.pid
 *.db

@@ -43,6 +43,14 @@ si no, conserva el theta anterior) y reemplaza `models/etas_params.pkl` de forma
 atómica. El dial lo lee en la siguiente llamada, sin reinicios; `/aftershock`
 expone `refit_ts` + `refit_trigger`. Manual: `POST /tasks/refit-etas`.
 El LightGBM no se reentrena en vivo (requiere clima + build completo).
+
+### Push (notifications.vertexdc.com)
+`alert_new` además envía push (misma deduplicación y umbral que Telegram).
+Servidor guarda la `site_key` (env `NOTIFICATIONS_SITE_KEY`, Coolify UI, o
+`data/push.json` en local — NUNCA commitear ni exponer al navegador: con ella
+se puede enviar a todos los suscritos). El navegador se suscribe vía proxy
+propio (`/api/push/vapid`, `/api/push/subscribe` + `sw-push.js`), nunca toca
+la llave. Botón en el Tablero → "Activar push del servidor".
 Estado en `GET /ingesta` y página `/ingesta`.
 
 ## Docs como fuente única
