@@ -17,7 +17,15 @@ export default defineNuxtConfig({
       title: 'Sismos Panamá — Pronóstico probabilístico',
       meta: [
         { name: 'description', content: 'PoC de pronóstico probabilístico de sismos M4+ a 7 días para Panamá. Investigación, no alerta oficial.' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' }
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'theme-color', content: '#0a0e14' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }
+      ],
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' }
       ],
       htmlAttrs: { lang: 'es', class: 'dark' }
     }
