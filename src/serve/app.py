@@ -173,6 +173,13 @@ def task_alert_test():
     _reg(m.message_id, m.actor_name, m.queue_name)
     return {"message_id": m.message_id, "nota": "sin credenciales Telegram = dry-run en log"}
 
+@app.post("/tasks/refit-etas")
+def task_refit_etas(trigger: str = "manual"):
+    from src.tasks.actors import refit_etas
+    m = refit_etas.send(trigger)
+    _reg(m.message_id, m.actor_name, m.queue_name)
+    return {"message_id": m.message_id, "queue": "default"}
+
 @app.post("/tasks/prospective")
 def task_prospective():
     from src.tasks.actors import prospective_issue

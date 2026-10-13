@@ -28,6 +28,10 @@ def ingest_quakes(start: str, end: str, out: str = "data/raw/quakes_full.parquet
         _stamp(int(len(fresh)))
         if len(fresh):
             alert_new.send(ev.astype({"mag": float}).to_dict(orient="records"))
+        grandes = fresh[pd.to_numeric(fresh.mag, errors="coerce") >= 6.0]
+        if len(grandes):
+            g0 = grandes.iloc[0]
+            refit_etas.send(f"M{float(g0.mag):.1f} {g0.id}")
     return {"nuevos": int(len(fresh))}
 
 def _stamp(n: int):
@@ -108,6 +112,9 @@ def ingest_igc():
         ev["time"] = pd.to_datetime(ev["time"], utc=True).astype(str)
         alert_new.send(ev[["id", "time", "lat", "lon", "depth", "mag", "place"]].astype(
             {"mag": float}).to_dict(orient="records"))
+        big = add[pd.to_numeric(add.mag, errors="coerce") >= 6.0]
+        if len(big):
+            refit_etas.send(f"M{float(big.iloc[0].mag):.1f} {big.iloc[0].id}")
     return {"nuevos_igc": int(len(add))}
 
 @dramatiq.actor(queue_name="live", store_results=True)
@@ -158,6 +165,13 @@ def live_poll():
     ingest_quakes.send(start, now.strftime("%Y-%m-%dT%H:%M:%S"))
     ingest_igc.send()
     live_poll.send_with_options(delay=300_000)
+
+@dramatiq.actor(queue_name="default", store_results=True, time_limit=600_000)
+def refit_etas(trigger: str = "manual"):
+    """Reajuste ETAS en vivo sobre ventana movil (ver src.models.etas.refit_recent).
+    Se encola solo al ingresar un M6+ nuevo; el dial lo lee sin reinicios."""
+    from src.models.etas import refit_recent
+    return refit_recent(trigger=trigger)
 
 @dramatiq.actor(queue_name="default", store_results=True)
 def prospective_issue():

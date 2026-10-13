@@ -41,6 +41,59 @@ def fit_zone(t, m):
     mu_gen = len(t) / T  # fallback: tasa media
     return mu_gen, 0.02, c, p, alpha
 
+def refit_recent(years: int = 10, path: str = "data/raw/quakes_full.parquet",
+                 out: str = "models/etas_params.pkl", min_events: int = 30,
+                 trigger: str = "manual"):
+    """Reajuste ETAS en vivo sobre ventana movil: se encola al ingresar un M6+ nuevo.
+
+    Ajusta (mu, K) por zona con el catalogo actual (M4+, ventana `years`). Zonas
+    con <min_events conservan su theta anterior (estabilidad). Guarda atomico
+    (tmp + rename): el dial lo lee en la siguiente llamada, sin reinicios.
+    """
+    import os, pickle, tempfile
+    from datetime import datetime, timezone
+    from src.features.zones import assign_zone
+    q = pd.read_parquet(path)
+    q["time"] = pd.to_datetime(q["time"], utc=True)
+    q["zone"] = [assign_zone(la, lo) for la, lo in zip(q.lat, q.lon)]
+    q = q.dropna(subset=["zone"])
+    q = q[pd.to_numeric(q.mag, errors="coerce") >= MC].sort_values("time")
+    tmax = q.time.max()
+    win = q[q.time >= tmax - pd.Timedelta(days=365 * years)]
+    prev = {}
+    if os.path.exists(out):
+        try:
+            prev = pickle.load(open(out, "rb")).get("thetas", {})
+        except Exception:
+            prev = {}
+    thetas, kept = {}, []
+    for z, g in win.groupby("zone"):
+        if len(g) < min_events and z in prev:
+            thetas[z] = prev[z]; kept.append(z); continue
+        t = (g.time - g.time.min()).dt.total_seconds().values / 86400
+        thetas[z] = fit_zone(t, g.mag.values)
+    for z, th in prev.items():
+        if z not in thetas:
+            thetas[z] = th; kept.append(z)
+    payload = {"thetas": thetas, "t0": q.time.min(), "cut2": str(tmax.date()),
+               "refit_ts": datetime.now(timezone.utc).isoformat(), "trigger": trigger,
+               "kept": kept}
+    d = os.path.dirname(out) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".pkl")
+    os.close(fd)
+    try:
+        pickle.dump(payload, open(tmp, "wb"))
+        os.replace(tmp, out)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return {"zonas_reajustadas": sorted(set(thetas) - set(kept)), "conservadas": sorted(kept),
+            "trigger": trigger, "refit_ts": payload["refit_ts"]}
+
 def expected_7d_vec(th, thist, mhist, tq):
     mu, K, c, p, alpha = th
     dt = tq[:, None] - thist[None, :]

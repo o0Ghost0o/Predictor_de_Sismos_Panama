@@ -35,6 +35,14 @@ Cada evento nuevo también se anexa a `data/live_events.jsonl`, que el websocket
 sigue por offset (sin reentrenar, sin Redis — proceso liviano para 8GB RAM).
 Retraso típico ≈ 60–70 min (latencia del propio USGS, no nuestra).
 El dial ETAS lee el catálogo al vuelo: un M nuevo mueve p24 en minutos, sin reentrenar.
+
+### Reajuste en vivo (`refit_etas`, cola `default`)
+Al ingresar un M6+ nuevo (`ingest_quakes` o `ingest_igc`), se encola `refit_etas`:
+reajusta (mu, K) por zona sobre ventana móvil de 10 años (M4+, mín 30 eventos;
+si no, conserva el theta anterior) y reemplaza `models/etas_params.pkl` de forma
+atómica. El dial lo lee en la siguiente llamada, sin reinicios; `/aftershock`
+expone `refit_ts` + `refit_trigger`. Manual: `POST /tasks/refit-etas`.
+El LightGBM no se reentrena en vivo (requiere clima + build completo).
 Estado en `GET /ingesta` y página `/ingesta`.
 
 ## Docs como fuente única
