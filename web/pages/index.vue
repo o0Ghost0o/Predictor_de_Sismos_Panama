@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useLiveFeed } from '~/composables/useLiveFeed'
+import { useRtAlerts } from '~/composables/useRtAlerts'
 
 const { data: zones } = await useFetch<any[]>('/api/risk')
 const { data: aft } = await useFetch<any>('/api/aftershock')
 const { data: ing } = await useFetch<any>('/api/ingesta')
 const hace120d = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10)
 const { data: sismos } = await useFetch<any[]>('/api/quakes', { params: { minmag: 4.0, start: hace120d } })
-const { connected } = useLiveFeed()
+const { connected, alerts, settings: rt, clearAlerts } = useRtAlerts()
 
 const ahora = Date.now()
 const en7d = (sismos.value ?? []).filter((q) => Date.parse(q.time) >= ahora - 7 * 864e5)
@@ -68,6 +68,35 @@ const porNivel = [...(zones.value ?? [])].sort((a, b) => b.nivel - a.nivel || b.
           <p class="text-[11px] text-slate-500">sismos M4+ desde 1970</p>
         </div>
       </div>
+    </section>
+
+    <section class="card p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold text-slate-100">Alertas en tiempo real</h2>
+        <div class="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+          <label class="flex items-center gap-2"><input v-model="rt.enabled" type="checkbox" class="accent-amber-500" /> Activas</label>
+          <label class="flex items-center gap-2">Umbral
+            <select v-model.number="rt.minMag" class="input ml-1 !rounded-md !px-2 !py-1 text-xs">
+              <option :value="4.0">M4.0+</option><option :value="4.5">M4.5+</option>
+              <option :value="5.0">M5.0+</option><option :value="5.5">M5.5+</option>
+              <option :value="6.0">M6.0+</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-2"><input v-model="rt.sound" type="checkbox" class="accent-amber-500" /> Sonido</label>
+          <button v-if="alerts.length" class="underline hover:text-slate-200" @click="clearAlerts()">Limpiar</button>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-slate-500">Suenan en tu navegador cuando ingresa un sismo nuevo ≥ umbral. Solo con esta pestaña abierta; no es alerta oficial.</p>
+      <ul v-if="alerts.length" class="mt-3 divide-y divide-white/5">
+        <li v-for="a in alerts" :key="a.id" class="flex items-center gap-3 py-2">
+          <span class="num w-14 shrink-0 text-base font-bold" :class="a.mag >= 6 ? 'text-red-300' : a.mag >= 5 ? 'text-orange-300' : 'text-amber-200'">M{{ a.mag.toFixed(1) }}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm text-slate-200">{{ a.place }}</span>
+            <span class="num block text-[11px] text-slate-500">{{ fmtFecha(a.time) }} · {{ Math.round(a.depth) }} km</span>
+          </span>
+        </li>
+      </ul>
+      <p v-else class="mt-3 text-sm text-slate-500">Sin alertas en esta sesión — deja esta pestaña abierta.</p>
     </section>
 
     <section v-if="aft?.modo_secuencia" class="card border-red-500/40 p-5">
