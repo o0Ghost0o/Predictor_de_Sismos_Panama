@@ -10,6 +10,15 @@ const sinLlave = ref(false)
 const counts = ref({ total: 0, visibles: 0 })
 const orden = ref<'fecha' | 'mag'>('fecha') // fecha sigue siendo el orden por defecto
 const soloSel = ref(false)
+const vel = ref(3) // días por segundo
+const cursor = ref(0) // ms: los eventos con time <= cursor están visibles
+const rangoMs = ref({ min: 0, max: 0 })
+const playing = ref(false)
+const loop = ref(false)
+const verCalor = ref(false)
+let timer: any = null
+let times: number[] = []
+let heat: any = null
 const base = ref<any[]>([]) // visibles, en orden de dibujo (recientes últimos), alineado con circles
 const selCi = ref(-1) // índice en circles del seleccionado
 const lista = computed(() => {
@@ -41,7 +50,7 @@ function loadGoogle(key: string): Promise<any> {
   if (w.google?.maps) return Promise.resolve(w.google)
   return new Promise((resolve, reject) => {
     const s = document.createElement('script')
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&v=weekly`
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&v=weekly&libraries=visualization`
     s.async = true
     s.onload = () => resolve(w.google)
     s.onerror = reject
@@ -66,6 +75,10 @@ async function draw() {
   counts.value = { total: qs.length, visibles: sel.length }
   base.value = sel
   selCi.value = -1
+  times = sel.map((q) => Date.parse(q.time))
+  rangoMs.value = times.length ? { min: Math.min(...times), max: Math.max(...times) } : { min: 0, max: 0 }
+  cursor.value = rangoMs.value.max
+  buildHeat()
   aplicarVis()
   for (const q of sel) {
     const col = magColor(q.mag)
@@ -89,7 +102,40 @@ const fmtList = (t: string) => new Date(t).toLocaleString('es-PA', { timeZone: '
 
 function aplicarVis() {
   if (!map) return
-  circles.forEach((c, j) => c.setMap(!soloSel.value || selCi.value < 0 || j === selCi.value ? map : null))
+  circles.forEach((c, j) => c.setMap(
+    times[j] <= cursor.value && (!soloSel.value || selCi.value < 0 || j === selCi.value) ? map : null))
+}
+
+function play() {
+  if (!map || !base.value.length) return
+  if (cursor.value >= rangoMs.value.max) cursor.value = rangoMs.value.min
+  playing.value = true
+  clearInterval(timer)
+  timer = setInterval(() => {
+    cursor.value += vel.value * 864e5 * 0.2
+    if (cursor.value >= rangoMs.value.max) {
+      if (loop.value) cursor.value = rangoMs.value.min
+      else { cursor.value = rangoMs.value.max; pausar(); return }
+    }
+    aplicarVis()
+  }, 200)
+}
+
+function pausar() {
+  playing.value = false
+  clearInterval(timer)
+  aplicarVis()
+}
+
+function buildHeat() {
+  if (heat) { heat.setMap(null); heat = null }
+  if (map && G && verCalor.value && base.value.length) {
+    heat = new G.maps.visualization.HeatmapLayer({
+      data: base.value.map((q) => ({ location: new G.maps.LatLng(q.lat, q.lon), weight: Math.pow(2, q.mag - 4) })),
+      map, radius: 22, opacity: 0.55,
+      gradient: ['rgba(0,0,0,0)', 'rgba(232,179,75,0.55)', 'rgba(209,154,107,0.75)', 'rgba(248,113,113,0.9)']
+    })
+  }
 }
 
 function select(item: { q: any; ci: number }) {
@@ -158,9 +204,10 @@ let nombres: any[] = []
   map.controls[G.maps.ControlPosition.RIGHT_BOTTOM].push(legend)
   await draw()
 })
-onUnmounted(() => { circles = []; placas = []; map = null })
+onUnmounted(() => { clearInterval(timer); circles = []; placas = []; nombres = []; times = []; heat = null; map = null })
 watch([rango, hora, minmag], draw)
 watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? map : null) })
+watch(cursor, aplicarVis)
 </script>
 <template>
   <div class="space-y-4">
@@ -196,6 +243,17 @@ watch(verPlacas, (v) => { for (const l of [...placas, ...nombres]) l.setMap(v ? 
         </label>
         <label class="flex items-center gap-2"><input v-model="verPlacas" type="checkbox" class="accent-amber-500" /> Placas</label>
       <label class="flex items-center gap-2"><input v-model="soloSel" type="checkbox" class="accent-amber-500" @change="aplicarVis()" /> Solo seleccionado</label>
+      <label class="flex items-center gap-2"><input v-model="verCalor" type="checkbox" class="accent-amber-500" @change="buildHeat()" /> Calor</label>
+      </div>
+      <div class="card flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <button class="btn shrink-0 px-4 text-sm" :disabled="!base.length" @click="playing ? pausar() : play()">{{ playing ? 'Pausar' : 'Reproducir' }}</button>
+        <input v-model.number="cursor" type="range" :min="rangoMs.min" :max="rangoMs.max" :disabled="!base.length" step="3600000" class="w-full accent-amber-500" @input="pausar()" title="Arrastrar para reproducir manualmente" />
+        <span class="num shrink-0 text-xs text-slate-300">{{ base.length ? fmtList(new Date(cursor).toISOString()) + ' UTC' : '—' }}</span>
+        <select v-model.number="vel" class="input shrink-0 !rounded-md !px-2 !py-1 text-xs" title="Velocidad">
+          <option :value="1">1 d/s</option><option :value="3">3 d/s</option>
+          <option :value="7">7 d/s</option><option :value="30">30 d/s</option>
+        </select>
+        <label class="flex shrink-0 items-center gap-2 text-xs text-slate-400"><input v-model="loop" type="checkbox" class="accent-amber-500" /> Repetir</label>
       </div>
       <div class="flex flex-col gap-4 lg:flex-row">
         <div id="mapa" class="card h-[65vh] min-h-[420px] w-full overflow-hidden lg:flex-1" />
