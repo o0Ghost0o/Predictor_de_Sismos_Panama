@@ -7,6 +7,7 @@
           Sismos Panamá <span class="text-xs font-normal text-slate-400">PoC</span>
         </NuxtLink>
         <nav class="flex flex-wrap gap-4 text-sm">
+          <NuxtLink class="navlink" to="/">Tablero</NuxtLink>
           <NuxtLink class="navlink" to="/pronostico">Pronóstico</NuxtLink>
           <NuxtLink class="navlink" to="/mapa">Mapa</NuxtLink>
           <NuxtLink class="navlink" to="/comparativa">Comparativa</NuxtLink>
