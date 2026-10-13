@@ -124,8 +124,16 @@ function toggleFallas(v: boolean) {
 
 function aplicarVis() {
   if (!map) return
+  if (soloSel.value) {
+    // Un solo evento: el más reciente <= cursor; la lista lo resalta.
+    let idx = -1
+    for (let j = 0; j < times.length; j++) if (times[j] <= cursor.value) idx = j
+    selCi.value = idx
+    circles.forEach((c, j) => c.setMap(j === idx ? map : null))
+    return
+  }
   circles.forEach((c, j) => c.setMap(
-    times[j] <= cursor.value && (!soloSel.value || selCi.value < 0 || j === selCi.value) ? map : null))
+    times[j] <= cursor.value && (selCi.value < 0 || j === selCi.value) ? map : null))
 }
 
 function play() {
@@ -135,7 +143,7 @@ function play() {
   playing.value = true
   clearInterval(timer)
   timer = setInterval(() => {
-    pos = Math.min(pos + vel.value, ordenT.length)
+    pos = Math.min(pos + (soloSel.value ? 1 : vel.value), ordenT.length)
     cursor.value = ordenT[pos - 1] ?? rangoMs.value.min
     if (pos >= ordenT.length) {
       if (loop.value) pos = 0
@@ -239,9 +247,10 @@ function buildHeat() {
 
 function select(item: { q: any; ci: number }) {
   if (!map || !G) return
-  selCi.value = item.ci
-  aplicarVis()
   const q = item.q
+  if (soloSel.value) cursor.value = times[item.ci] ?? cursor.value
+  else selCi.value = item.ci
+  aplicarVis()
   map.panTo({ lat: q.lat, lng: q.lon })
   info.setContent(ficha(q))
   info.setPosition({ lat: q.lat, lng: q.lon })
