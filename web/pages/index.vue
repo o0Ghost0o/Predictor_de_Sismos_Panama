@@ -112,6 +112,7 @@ const porNivel = [...(zones.value ?? [])].sort((a, b) => b.nivel - a.nivel || b.
           <p class="num text-[11px] text-slate-400">réplica M4+ en 24 h</p>
         </div>
       </div>
+      <p class="mt-3 max-w-4xl text-xs leading-relaxed text-slate-400">Estos porcentajes son P(réplica M4+ en 24 h) del modelo ETAS de corto plazo; el Nivel de la tabla inferior es P(M4+ a 7 días) del modelo LGBM. En secuencia activa pueden discrepar sin contradecirse: el dial manda para hoy, el Nivel para la semana. Ninguno predice fecha ni hora.</p>
     </section>
 
     <section>
