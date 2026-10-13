@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const { data: latest } = await useFetch<any[]>('/api/risk')
-const fecha = ref(latest.value?.[0]?.date ?? new Date().toISOString().slice(0, 10))
+const hoy = new Date().toISOString().slice(0, 10)
+const fecha = ref(latest.value?.[0]?.date ?? hoy)
 const { data: zones, refresh, pending } = await useFetch<any[]>('/api/risk', { query: { date: fecha } })
 watch(fecha, () => refresh())
 </script>
@@ -11,7 +12,7 @@ watch(fecha, () => refresh())
       <p class="text-sm text-slate-400">Hindcast: elige cualquier fecha 1970–hoy y compara contra lo que realmente pasó (dato USGS).</p>
     </div>
     <div class="flex items-center gap-3">
-      <input v-model="fecha" type="date" min="1970-01-01" max="2026-10-10" class="input" />
+      <input v-model="fecha" type="date" min="1970-01-01" :max="hoy" class="input" />
       <button class="btn text-sm" :disabled="pending" @click="refresh()">{{ pending ? '…' : 'Consultar' }}</button>
     </div>
     <div v-if="zones?.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
