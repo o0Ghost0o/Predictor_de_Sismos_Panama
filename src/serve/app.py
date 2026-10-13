@@ -1,8 +1,42 @@
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from functools import lru_cache
+from contextlib import asynccontextmanager
 import pandas as pd, pickle
 
-app = FastAPI(title="Sismos Panama PoC")
+def _edad_archivo_min(path: str, clave: str = "ts") -> float | None:
+    """Edad en minutos de un stamp JSON; None si no existe o es ilegible."""
+    import json
+    from datetime import datetime, timezone
+    try:
+        ts = json.load(open(path))[clave]
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(ts)).total_seconds() / 60
+    except Exception:
+        return None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-arranque de ingesta en vivo: en produccion nadie pulsa /tasks/live-start
+    # tras cada despliegue/reinicio. El heartbeat lo toca cada pasada de live_poll;
+    # solo encolamos si no hay latido reciente (los loops se auto-reagendan solos).
+    # Nunca tumba el arranque del API.
+    latido = _edad_archivo_min("data/live_heartbeat.json")
+    if latido is not None and latido < 10:
+        yield
+        return
+    edad = _edad_archivo_min("data/last_ingest.json")
+    if edad is None or edad > 15:
+        try:
+            from src.tasks.actors import live_poll, fast_poll, resync_catalog
+            live_poll.send(); fast_poll.send()
+            if edad is None or edad > 7 * 24 * 60:
+                resync_catalog.send()  # backfill tardio USGS, caro: solo si >7d
+            print(f"[boot] loops de ingesta encolados (edad stamp: {edad})", flush=True)
+        except Exception as e:
+            print(f"[boot] ingesta auto no disponible ({e}); usar POST /tasks/live-start",
+                  flush=True)
+    yield
+
+app = FastAPI(title="Sismos Panama PoC", lifespan=lifespan)
 
 @lru_cache
 def _load():

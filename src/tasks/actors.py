@@ -178,8 +178,10 @@ def fast_poll():
 @dramatiq.actor(queue_name="live")
 def live_poll():
     """Sondea ultimas 3h (USGS + IGC) y se auto-reagenda en 5 min (sin scheduler externo)."""
+    import json
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
+    open("data/live_heartbeat.json", "w").write(json.dumps({"ts": now.isoformat()}))
     start = (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
     ingest_quakes.send(start, now.strftime("%Y-%m-%dT%H:%M:%S"))
     ingest_igc.send()
