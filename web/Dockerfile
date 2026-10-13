@@ -1,4 +1,4 @@
-# Sismos Panama web (Nuxt 4). Contexto de build = raiz del repo (ver docker-compose.yml),
+# Sismos Panama web (Nuxt 4). Contexto de build = raiz del repo (ver docker-compose.yaml),
 # porque server/api/docs.get.ts lee ../docs en tiempo de ejecucion.
 FROM oven/bun:1 AS build
 

@@ -1,5 +1,5 @@
 # Predictor de Sismos Panama — imagen API + worker (misma imagen, distinto comando).
-# Worker: mismo build, command override en docker-compose.yml.
+# Worker: mismo build, command override en docker-compose.yaml.
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
