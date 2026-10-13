@@ -200,10 +200,11 @@ const porNivel = [...(zones.value ?? [])].sort((a, b) => b.nivel - a.nivel || b.
           (arriba) limita lo "en vivo" que puede ser cualquier tablero.
         </p>
       </div>
-      <div class="mt-4 flex flex-wrap gap-3 text-sm">
+      <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
         <NuxtLink class="btn" to="/mapa">Mapa tectónico</NuxtLink>
         <NuxtLink class="btn" to="/comparativa">Comparativa de modelos</NuxtLink>
         <NuxtLink class="btn" to="/estudios">Estudios y veredictos</NuxtLink>
+        <a class="ml-auto text-xs text-slate-400 underline hover:text-slate-200" href="https://github.com/o0Ghost0o/Predictor_de_Sismos_Panama" target="_blank" rel="noopener">Código en GitHub</a>
       </div>
     </section>
   </div>
