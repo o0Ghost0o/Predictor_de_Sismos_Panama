@@ -7,7 +7,7 @@ from . import broker  # noqa: F401  (registra broker global)
 @dramatiq.actor(queue_name="io", store_results=True, max_retries=3, min_backoff=30_000)
 def ingest_quakes(start: str, end: str, out: str = "data/raw/quakes_full.parquet"):
     import pandas as pd
-    from src.ingest.api_usgs import fetch
+    from src.ingest.api_usgs import fetch, atomic_parquet
     new = fetch(start, end, minmag=4.0)
     try:
         old = pd.read_parquet(out)
@@ -18,7 +18,7 @@ def ingest_quakes(start: str, end: str, out: str = "data/raw/quakes_full.parquet
     if len(fresh):
         import json
         full = pd.concat([old, fresh], ignore_index=True).drop_duplicates("id")
-        full.to_parquet(out, index=False)
+        atomic_parquet(full, out)
         ev = fresh[["id", "time", "lat", "lon", "depth", "mag", "place"]].copy()
         ev["time"] = pd.to_datetime(ev["time"], utc=True).astype(str)
         with open("data/live_events.jsonl", "a") as f:
@@ -66,15 +66,16 @@ def resync_catalog():
     ene–sep 2026 que entraron semanas después). Se auto-reagenda cada 30 días."""
     import pandas as pd
     from datetime import datetime, timezone
-    from src.ingest.api_usgs import fetch
+    from src.ingest.api_usgs import fetch, atomic_parquet
     now = datetime.now(timezone.utc)
     new = fetch("2025-01-01", now.strftime("%Y-%m-%dT%H:%M:%S"), minmag=4.0)
     old = pd.read_parquet("data/raw/quakes_full.parquet")
     have = set(old.id)
     fresh = new[~new.id.isin(have)]
     if len(fresh):
-        pd.concat([old, fresh], ignore_index=True).drop_duplicates("id").to_parquet(
-            "data/raw/quakes_full.parquet", index=False)
+        atomic_parquet(
+            pd.concat([old, fresh], ignore_index=True).drop_duplicates("id"),
+            "data/raw/quakes_full.parquet")
     resync_catalog.send_with_options(delay=30 * 86400_000)
     return {"recuperados": int(len(fresh)), "total": int(len(old) + len(fresh))}
 
@@ -99,8 +100,10 @@ def ingest_igc():
         keep.append(r.Index)
     add = igc.loc[keep]
     if len(add):
-        pd.concat([old, add], ignore_index=True).drop_duplicates("id").to_parquet(
-            "data/raw/quakes_full.parquet", index=False)
+        from src.ingest.api_usgs import atomic_parquet
+        atomic_parquet(
+            pd.concat([old, add], ignore_index=True).drop_duplicates("id"),
+            "data/raw/quakes_full.parquet")
         ev = add.copy()
         ev["time"] = pd.to_datetime(ev["time"], utc=True).astype(str)
         alert_new.send(ev[["id", "time", "lat", "lon", "depth", "mag", "place"]].astype(

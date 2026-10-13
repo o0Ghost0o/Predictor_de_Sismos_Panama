@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 ROOT := $(shell pwd)
 
-.PHONY: install api worker web up down status logs live tasks-logs compose-up compose-down compose-logs
+.PHONY: install api worker web up down status logs live tasks-logs compose-up compose-down compose-logs test
 
 install: ## deps Python (uv) + web (bun)
 	uv sync
@@ -53,3 +53,6 @@ compose-down: ## baja el stack docker (conserva volumenes)
 
 compose-logs: ## logs del stack docker
 	docker compose logs -f --tail=100
+
+test: ## salud de datos+modelos que la API necesita
+	uv run --with pytest pytest tests/ -q

@@ -5,7 +5,7 @@ El dial ETAS lee el catalogo al vuelo: un M nuevo mueve p24 en minutos."""
 import argparse, json, time
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from src.ingest.api_usgs import fetch
+from src.ingest.api_usgs import fetch, atomic_parquet
 
 RAW = "data/raw/quakes_full.parquet"
 STATE = "data/last_ingest.json"
@@ -21,7 +21,7 @@ def poll() -> dict:
     have = set(old.id) if len(old) else set()
     fresh = new[~new.id.isin(have)] if len(new) else new
     if len(fresh):
-        pd.concat([old, fresh], ignore_index=True).drop_duplicates("id").to_parquet(RAW, index=False)
+        atomic_parquet(pd.concat([old, fresh], ignore_index=True).drop_duplicates("id"), RAW)
         ev = fresh[["id", "time", "lat", "lon", "depth", "mag", "place"]].copy()
         ev["time"] = pd.to_datetime(ev["time"], utc=True).astype(str)
         with open("data/live_events.jsonl", "a") as f:
