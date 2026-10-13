@@ -22,3 +22,19 @@ def test_sismolive_y_emsc_enlazan_a_su_portal():
 def test_sin_id_no_hay_enlace():
     assert event_url(None, "usgs") is None
     assert event_url("", "usgs") is None
+
+
+def test_nan_no_rompe():
+    import math
+    assert event_url(math.nan, math.nan) is None
+    assert event_url("us6000u18k", math.nan) == \
+        "https://earthquake.usgs.gov/earthquakes/eventpage/us6000u18k"
+
+
+def test_quakes_devuelve_url_para_todo_el_catalogo():
+    """Regresion: una fila con src/id vacio no debe tumbar /quakes
+    (el frontend muestra '0 eventos en rango' ante un 500)."""
+    from src.serve.app import quakes
+    rows = quakes(minmag=0.0, limit=5000)
+    assert len(rows) > 0
+    assert all("url" in r and "src" in r for r in rows)

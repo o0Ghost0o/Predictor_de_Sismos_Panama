@@ -263,8 +263,8 @@ def event_url(qid: str | None, src: str | None) -> str | None:
       rodante sin archivo y no se guarda en el parquet.
     - SismoLive/EMSC (`sl-...`): portal agregador (tampoco guarda deep-link).
     """
-    qid = (qid or "").strip()
-    s = (src or "").strip().lower()
+    qid = "" if pd.isna(qid) else str(qid).strip()
+    s = "" if pd.isna(src) else str(src).strip().lower()
     if qid.startswith("igc-") or s == "igc":
         return IGC_HOME
     if qid.startswith("sl-"):
