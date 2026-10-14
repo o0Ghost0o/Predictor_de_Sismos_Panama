@@ -38,3 +38,15 @@ def test_quakes_devuelve_url_para_todo_el_catalogo():
     rows = quakes(minmag=0.0, limit=5000)
     assert len(rows) > 0
     assert all("url" in r and "src" in r for r in rows)
+
+
+def test_quakes_serializable_json_estricto():
+    """Regresion: /quakes responde JSON estricto (Starlette usa
+    allow_nan=False). Un NaN en src/id tumba la respuesta con 500 y el
+    proxy de Nuxt lo convierte en []: historico vacio en el frontend."""
+    import json
+
+    from src.serve.app import quakes
+    rows = quakes(minmag=4.0, limit=5000, start="2026-06-16")
+    assert len(rows) > 0
+    json.dumps(rows, allow_nan=False)

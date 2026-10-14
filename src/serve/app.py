@@ -289,6 +289,15 @@ def quakes(minmag: float = 0.0, limit: int = 5000, start: str | None = None, end
     if "src" not in q.columns:
         q["src"] = "usgs"
     out = q[["time", "lat", "lon", "depth", "mag", "place", "id", "src"]].copy()
+    # JSON estricto (Starlette serializa con allow_nan=False): ningun NaN
+    # puede salir o la respuesta es 500 y el proxy de Nuxt lo convierte en
+    # [] (historico vacio en el frontend). El parquet trae filas USGS sin
+    # src (NaN float): se asume "usgs"; el resto de NaN se vuelve None/null.
+    out["id"] = [None if pd.isna(v) else str(v) for v in out["id"]]
+    out["src"] = ["usgs" if pd.isna(v) else str(v) for v in out["src"]]
+    out["place"] = [None if pd.isna(v) else str(v) for v in out["place"]]
+    for c in ("lat", "lon", "depth", "mag"):
+        out[c] = [None if pd.isna(v) else float(v) for v in out[c]]
     out["url"] = [event_url(i, s) for i, s in zip(out["id"], out["src"])]
     return out.to_dict(orient="records")
 
