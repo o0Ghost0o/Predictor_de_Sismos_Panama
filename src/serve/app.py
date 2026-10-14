@@ -283,7 +283,13 @@ def quakes(minmag: float = 0.0, limit: int = 5000, start: str | None = None, end
     if end:
         q = q[q.time <= pd.to_datetime(end, utc=True) + pd.Timedelta(days=1)]
     q = q[q.mag >= minmag].sort_values("time").tail(limit)
-    q["time"] = q.time.astype(str)
+    # Sin huecos en lo esencial: una fila sin mag/coords rompe el render
+    # del frontend (toFixed/mapa sobre null), asi que se excluye.
+    q = q.dropna(subset=["time", "lat", "lon", "mag"])
+    # ISO8601 con 'T': el str() de pandas deja "2026-..-.. HH:MM:SS+00:00"
+    # (espacio), que Safari no parsea y rompe los filtros de fecha y la
+    # comparacion lexicografica del mapa en rango custom.
+    q["time"] = [t.isoformat() for t in q["time"]]
     if "id" not in q.columns:
         q["id"] = None
     if "src" not in q.columns:

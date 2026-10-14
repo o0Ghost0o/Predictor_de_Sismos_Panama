@@ -50,3 +50,18 @@ def test_quakes_serializable_json_estricto():
     rows = quakes(minmag=4.0, limit=5000, start="2026-06-16")
     assert len(rows) > 0
     json.dumps(rows, allow_nan=False)
+
+
+def test_quakes_tiempo_iso_y_sin_huecos_esenciales():
+    """El frontend filtra con Date.parse y compara strings contra ISO con
+    'T': el tiempo debe ser ISO8601 con T y mag/lat/lon nunca null."""
+    from datetime import datetime
+
+    from src.serve.app import quakes
+    rows = quakes(minmag=4.0, limit=5000, start="2026-06-16")
+    assert len(rows) > 0
+    for r in rows:
+        assert "T" in r["time"], r["time"]
+        datetime.fromisoformat(r["time"])
+        assert isinstance(r["mag"], float)
+        assert isinstance(r["lat"], float) and isinstance(r["lon"], float)
